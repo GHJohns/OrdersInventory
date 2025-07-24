@@ -1,0 +1,34 @@
+# Node dependencies
+node_modules/
+
+# Production builds (React or server)
+build/
+dist/
+
+# Local environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# IDE / editor files (optional but recommended)
+.vscode/
+.idea/
+
+# Mac system files
+.AppleDouble
+.LSOverride
+
+# Windows system files
+Desktop.ini
+
+# Misc
+*.log
