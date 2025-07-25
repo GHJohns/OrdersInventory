@@ -2,22 +2,25 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function OrdersPage() {
-  const [orderRows, setOrderRows] = useState(Array(50).fill({ itemNumber: '', quantity: '' }));
-  const [orders, setOrders] = useState([]);
+  const [itemsList, setItemsList] = useState([]);
+  const [orderRows, setOrderRows] = useState([{ itemNumber: '', quantity: 1 }]);
   const [customerName, setCustomerName] = useState('');
+  const [orders, setOrders] = useState([]);
   const [filterName, setFilterName] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    fetch('http://localhost:5000/api/items')
+      .then(res => res.json())
+      .then(data => setItemsList(data))
+      .catch(err => console.error(err));
+  }, []);
+
   const loadOrders = useCallback(() => {
     fetch('http://localhost:5000/api/orders')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to load orders');
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => {
-        setError('');
-
         let selectedDate, nextDate;
         if (filterDate) {
           selectedDate = new Date(filterDate);
@@ -32,60 +35,68 @@ export default function OrdersPage() {
             if (orderDate < selectedDate || orderDate >= nextDate) return false;
           }
           if (filterName) {
-            if (
-              !order.customerName ||
-              !order.customerName.toLowerCase().includes(filterName.toLowerCase())
-            ) {
-              return false;
-            }
+            if (!order.customerName?.toLowerCase().includes(filterName.toLowerCase())) return false;
           }
           return true;
         });
         setOrders(filtered);
       })
-      .catch(err => setError(err.message));
+      .catch(err => console.error(err));
   }, [filterName, filterDate]);
 
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
 
-  const handleRowChange = (index, field, value) => {
+  const handleRowChange = (idx, field, value) => {
     const updated = [...orderRows];
-    updated[index] = { ...updated[index], [field]: value };
+    updated[idx] = { ...updated[idx], [field]: value };
     setOrderRows(updated);
   };
 
-  const addMoreRows = () => {
-    setOrderRows([...orderRows, ...Array(50).fill({ itemNumber: '', quantity: '' })]);
+  const handleTab = (idx) => {
+    if (idx === orderRows.length - 1) {
+      setOrderRows([...orderRows, { itemNumber: '', quantity: 1 }]);
+    }
+  };
+
+  const getSuggestions = (value) => {
+    const input = value.toLowerCase();
+    if (!input) return [];
+    return itemsList.filter(item =>
+      item.itemNumber.replace(/^[A-Z]_/, '').startsWith(input)
+    );
   };
 
   const submitOrder = () => {
     const validItems = orderRows
-      .filter(row => row.itemNumber && row.quantity && Number(row.quantity) > 0)
-      .map(row => ({ itemNumber: row.itemNumber.trim(), quantity: Number(row.quantity) }));
+      .filter(r => r.itemNumber && Number(r.quantity) > 0)
+      .map(r => ({
+        itemNumber: r.itemNumber.trim(),
+        quantity: Number(r.quantity)
+      }));
 
-    if (validItems.length === 0) {
-      alert('Please enter at least one valid item.');
-      return;
-    }
     if (!customerName.trim()) {
       alert('Please enter a customer name.');
+      return;
+    }
+    if (validItems.length === 0) {
+      alert('Add at least one valid item.');
       return;
     }
 
     fetch('http://localhost:5000/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerName: customerName.trim(), items: validItems }),
+      body: JSON.stringify({ customerName, items: validItems }),
     })
       .then(res => {
-        if (!res.ok) throw new Error('Failed to create order');
+        if (!res.ok) throw new Error('Failed to submit order');
         return res.json();
       })
       .then(() => {
         alert('Order submitted!');
-        setOrderRows(Array(50).fill({ itemNumber: '', quantity: '' }));
+        setOrderRows([{ itemNumber: '', quantity: 1 }]);
         setCustomerName('');
         loadOrders();
       })
@@ -98,21 +109,22 @@ export default function OrdersPage() {
   };
 
   const canSubmit =
-    orderRows.some(row => row.itemNumber && row.quantity && Number(row.quantity) > 0) &&
+    orderRows.some(r => r.itemNumber && Number(r.quantity) > 0) &&
     customerName.trim() !== '';
 
+  // Keep track of focused suggestion for arrows
+  const [focusedIdx, setFocusedIdx] = useState(null);
+
   return (
-    <div style={{ display: 'flex', gap: 20 }}>
+    <div style={{ display: 'flex', gap: 30 }}>
       <div style={{ flex: 1 }}>
         <h2>New Order</h2>
-        <label>Customer Name:</label>
-        <br />
+        <label>Customer Name:</label><br />
         <input
-          type="text"
           value={customerName}
           onChange={e => setCustomerName(e.target.value)}
           style={{ width: '100%', marginBottom: 10 }}
-          placeholder="Enter customer/company name"
+          placeholder="Customer Name"
         />
 
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -123,60 +135,97 @@ export default function OrdersPage() {
             </tr>
           </thead>
           <tbody>
-            {orderRows.map((row, idx) => (
-              <tr key={idx}>
-                <td>
-                  <input
-                    type="text"
-                    value={row.itemNumber}
-                    onChange={e => handleRowChange(idx, 'itemNumber', e.target.value)}
-                    style={{ width: '100%' }}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    value={row.quantity}
-                    min="0"
-                    onChange={e => handleRowChange(idx, 'quantity', e.target.value)}
-                    style={{ width: '100%' }}
-                  />
-                </td>
-              </tr>
-            ))}
+            {orderRows.map((row, idx) => {
+              const suggestions = getSuggestions(row.itemNumber);
+              return (
+                <tr key={idx} style={{ position: 'relative' }}>
+                  <td>
+                    <input
+                      value={row.itemNumber}
+                      onChange={e => {
+                        handleRowChange(idx, 'itemNumber', e.target.value);
+                        setFocusedIdx(0);
+                      }}
+                      onKeyDown={e => {
+                        if (suggestions.length) {
+                          if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            setFocusedIdx(focusedIdx < suggestions.length - 1 ? focusedIdx + 1 : 0);
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            setFocusedIdx(focusedIdx > 0 ? focusedIdx - 1 : suggestions.length - 1);
+                          } else if (e.key === 'Enter' && focusedIdx !== null) {
+                            e.preventDefault();
+                            handleRowChange(idx, 'itemNumber', suggestions[focusedIdx].itemNumber);
+                            setFocusedIdx(null);
+                          }
+                        }
+                      }}
+                      style={{ width: '100%' }}
+                    />
+                    {suggestions.length > 0 && row.itemNumber && (
+                      <div style={{
+                        position: 'absolute',
+                        background: '#fff',
+                        border: '1px solid #ddd',
+                        width: '100%',
+                        zIndex: 10,
+                      }}>
+                        {suggestions.slice(0, 5).map((s, sidx) => (
+                          <div
+                            key={s.itemNumber}
+                            onClick={() => {
+                              handleRowChange(idx, 'itemNumber', s.itemNumber);
+                              setFocusedIdx(null);
+                            }}
+                            style={{
+                              padding: '5px',
+                              cursor: 'pointer',
+                              background: focusedIdx === sidx ? '#eee' : '#fff',
+                            }}
+                          >
+                            {s.itemNumber}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      value={row.quantity}
+                      onChange={e => handleRowChange(idx, 'quantity', e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Tab') handleTab(idx); }}
+                      style={{ width: '100%' }}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
-        <button onClick={addMoreRows}>Add 50 More Rows</button>
-        <button onClick={submitOrder} style={{ marginLeft: 10 }} disabled={!canSubmit}>
+        <button
+          onClick={submitOrder}
+          disabled={!canSubmit}
+          style={{ marginTop: 20 }}
+        >
           Submit Order
         </button>
-
-        {error && (
-          <div style={{ color: 'red', marginTop: 10, fontWeight: 'bold' }}>Error: {error}</div>
-        )}
+        {error && <div style={{ color: 'red', marginTop: 10 }}>{error}</div>}
       </div>
 
       <div style={{ flex: 1 }}>
         <h2>Orders</h2>
-        <label>Filter by Customer Name:</label>
-        <br />
+        <label>Filter by Name:</label><br />
         <input
-          type="text"
           value={filterName}
           onChange={e => setFilterName(e.target.value)}
           style={{ width: '100%', marginBottom: 10 }}
-          placeholder="Filter by customer/company name"
         />
         <label>Filter by Date:</label>
-        <button
-          onClick={clearFilters}
-          style={{ marginLeft: 10, fontSize: '0.8rem', padding: '2px 8px' }}
-          title="Clear filters"
-        >
-          Clear Filters
-        </button>
-        <br />
+        <button onClick={clearFilters} style={{ marginLeft: 10 }}>Clear</button><br />
         <input
           type="date"
           value={filterDate}
@@ -187,36 +236,12 @@ export default function OrdersPage() {
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {orders.length === 0 && <li>No orders found.</li>}
           {orders.map(order => (
-            <li
-              key={order.id}
-              style={{
-                borderBottom: '1px solid #ccc',
-                marginBottom: 10,
-                cursor: 'pointer',
-                padding: '10px 0',
-              }}
-            >
-              <Link
-                to={`/orders/${order.id}`} // ✅ Fix: matches App.js Route!
-                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-              >
-                <strong>Order ID:</strong> {order.id}
-                <br />
-                <strong>Customer:</strong> {order.customerName || '(No name)'}
-                <br />
-                <strong>Date:</strong> {new Date(order.createdAt).toLocaleString()}
-                <br />
-                <strong>Total Qty:</strong> {order.totalQuantity}
-                <br />
-                {order.items.length > 0 ? (
-                  order.items.map(item => (
-                    <div key={item.id}>
-                      - {item.itemNumber}: {item.quantity}
-                    </div>
-                  ))
-                ) : (
-                  <div>No items</div>
-                )}
+            <li key={order.id} style={{ borderBottom: '1px solid #ddd', marginBottom: 10 }}>
+              <Link to={`/pullsheet/${order.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                <strong>Order ID:</strong> {order.id}<br />
+                <strong>Customer:</strong> {order.customerName}<br />
+                <strong>Date:</strong> {new Date(order.createdAt).toLocaleString()}<br />
+                <strong>Items:</strong> {order.items.length}
               </Link>
             </li>
           ))}
