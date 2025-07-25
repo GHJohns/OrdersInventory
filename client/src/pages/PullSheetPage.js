@@ -19,13 +19,16 @@ export default function PullSheetPage() {
       })
       .then(data => {
         if (!data || !data.id) throw new Error('Invalid order data.');
-        // Sort items by itemNumber
+        console.log('Fetched order:', data); // ✅ Make sure this prints
         if (data.items && Array.isArray(data.items)) {
           data.items.sort((a, b) => a.itemNumber.localeCompare(b.itemNumber));
         }
         setOrder(data);
       })
-      .catch(err => setError(err.message));
+      .catch(err => {
+        console.error('Fetch error:', err);
+        setError(err.message);
+      });
   }, [orderId]);
 
   if (error) {
@@ -38,14 +41,14 @@ export default function PullSheetPage() {
     );
   }
 
-  if (!order) return <p>Loading pull sheet...</p>;
+  if (!order || !Array.isArray(order.items)) {
+    return <p style={{ padding: '20px' }}>Loading pull sheet...</p>;
+  }
 
-  // Group totals by category
   const categoryTotals = {};
-  order.items?.forEach(item => {
+  order.items.forEach(item => {
     const cat = item.category || 'Uncategorized';
-    if (!categoryTotals[cat]) categoryTotals[cat] = 0;
-    categoryTotals[cat] += item.quantity;
+    categoryTotals[cat] = (categoryTotals[cat] || 0) + item.quantity;
   });
 
   return (
@@ -53,6 +56,7 @@ export default function PullSheetPage() {
       <h1>Pull Sheet</h1>
       <h2>Order #{order.id}</h2>
       <p><strong>Customer:</strong> {order.customerName || 'N/A'}</p>
+      <p><strong>Notes:</strong> {order.notes || '—'}</p>
       <p><strong>Created:</strong> {new Date(order.createdAt).toLocaleString()}</p>
       <p><strong>Total Quantity:</strong> {order.totalQuantity}</p>
 
@@ -61,29 +65,34 @@ export default function PullSheetPage() {
       </button>
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Item Number</th>
-            <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Name</th>
-            <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Category</th>
-            <th style={{ borderBottom: '1px solid #333', textAlign: 'right' }}>Quantity</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items && order.items.length > 0 ? (
-            order.items.map(item => (
-              <tr key={`${item.id}-${item.itemNumber}`}>
-                <td>{item.itemNumber}</td>
-                <td>{item.name}</td>
-                <td>{item.category || 'Uncategorized'}</td>
-                <td style={{ textAlign: 'right' }}>{item.quantity}</td>
-              </tr>
-            ))
-          ) : (
-            <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px' }}>No items in this order.</td></tr>
-          )}
-        </tbody>
-      </table>
+  <thead>
+    <tr>
+      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Item Number</th>
+      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Category</th>
+      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Collection</th>
+      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Style</th>
+      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>*</th>
+      <th style={{ borderBottom: '1px solid #333', textAlign: 'right' }}>Quantity</th>
+    </tr>
+  </thead>
+  <tbody>
+    {order.items.length > 0 ? (
+      order.items.map(item => (
+        <tr key={`${item.id}-${item.itemNumber}`}>
+          <td>{item.itemNumber}</td>
+          <td>{item.category || 'Uncategorized'}</td>
+          <td>{item.collection || '—'}</td>
+          <td>{item.style || '—'}</td>
+          <td>{item.special || '_'}</td>
+          <td style={{ textAlign: 'right' }}>{item.quantity}</td>
+        </tr>
+      ))
+    ) : (
+      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>No items in this order.</td></tr>
+    )}
+  </tbody>
+</table>
+
 
       <h3 style={{ marginTop: '30px' }}>Category Totals</h3>
       <ul>
@@ -96,7 +105,6 @@ export default function PullSheetPage() {
         &larr; Back to Orders
       </Link>
 
-      {/* Inline print styles */}
       <style>{`
         @media print {
           button, a {

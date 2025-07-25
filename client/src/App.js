@@ -8,7 +8,12 @@ function App() {
   return (
     <Router>
       <div style={{ maxWidth: 800, margin: 'auto', padding: 20, fontFamily: 'Arial, sans-serif' }}>
-        <h1>Sun Rayz Premium Eyewear</h1>
+        <h1><img
+  src="https://sun-rayz.com/cdn/shop/files/test_230x.png?v=1632410189"
+  alt="Sun Rayz Logo"
+  style={{ maxHeight: 80, marginBottom: 20 }}
+/>
+</h1>
 
         <nav style={{ marginBottom: 20 }}>
           <Link to="/products" style={{ marginRight: 10 }}>Products</Link>

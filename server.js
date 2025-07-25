@@ -56,7 +56,7 @@ db.prepare(`
 app.get('/api/orders', (req, res) => {
   try {
     const orders = db.prepare(`
-      SELECT id, customerName, totalQuantity,
+      SELECT id, customerName, totalQuantity, notes,
              STRFTIME('%Y-%m-%dT%H:%M:%SZ', createdAt) AS createdAt
       FROM orders
     `).all();
@@ -85,7 +85,7 @@ app.get('/api/orders/:id', (req, res) => {
   const orderId = req.params.id;
   try {
     const order = db.prepare(`
-      SELECT id, customerName, totalQuantity,
+      SELECT id, customerName, totalQuantity, notes,
              STRFTIME('%Y-%m-%dT%H:%M:%SZ', createdAt) AS createdAt
       FROM orders WHERE id = ?
     `).get(orderId);
@@ -177,7 +177,7 @@ app.delete('/api/variants/:id', (req, res) => {
 // Create New Order
 // =====================
 app.post('/api/orders', (req, res) => {
-  const { customerName, items: orderItems } = req.body;
+  const { customerName, items: orderItems, notes } = req.body;
 
   if (!orderItems || orderItems.length === 0) {
     return res.status(400).json({ error: 'No items in order' });
@@ -186,10 +186,11 @@ app.post('/api/orders', (req, res) => {
   const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const insertOrder = db.prepare(`
-    INSERT INTO orders (customerName, totalQuantity)
-    VALUES (?, ?)
-  `);
-  const info = insertOrder.run(customerName || '', totalQuantity);
+  INSERT INTO orders (customerName, totalQuantity, notes)
+  VALUES (?, ?, ?)
+`);
+const info = insertOrder.run(customerName || '', totalQuantity, notes || '');
+
   const orderId = info.lastInsertRowid;
 
   const findItemId = db.prepare(`SELECT id FROM items WHERE itemNumber = ?`);

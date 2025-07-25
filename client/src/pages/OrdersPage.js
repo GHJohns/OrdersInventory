@@ -9,6 +9,8 @@ export default function OrdersPage() {
   const [filterName, setFilterName] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [error, setError] = useState('');
+  const [notes, setNotes] = useState('');
+
 
   useEffect(() => {
     fetch('http://localhost:5000/api/items')
@@ -88,7 +90,7 @@ export default function OrdersPage() {
     fetch('http://localhost:5000/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerName, items: validItems }),
+      body: JSON.stringify({ customerName, notes, items: validItems }),
     })
       .then(res => {
         if (!res.ok) throw new Error('Failed to submit order');
@@ -126,6 +128,15 @@ export default function OrdersPage() {
           style={{ width: '100%', marginBottom: 10 }}
           placeholder="Customer Name"
         />
+
+        <label>Notes:</label><br />
+        <textarea
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Special instructions or notes..."
+          style={{ width: '100%', marginBottom: 10, minHeight: 60 }}
+        />
+
 
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -237,10 +248,12 @@ export default function OrdersPage() {
           {orders.length === 0 && <li>No orders found.</li>}
           {orders.map(order => (
             <li key={order.id} style={{ borderBottom: '1px solid #ddd', marginBottom: 10 }}>
-              <Link to={`/pullsheet/${order.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+              <Link to={`/orders/${order.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <strong>Order ID:</strong> {order.id}<br />
                 <strong>Customer:</strong> {order.customerName}<br />
                 <strong>Date:</strong> {new Date(order.createdAt).toLocaleString()}<br />
+                {order.notes && (<><strong>Notes:</strong> {order.notes}<br /></>)}
+
                 <strong>Items:</strong> {order.items.length}
               </Link>
             </li>
