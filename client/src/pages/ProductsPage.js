@@ -18,6 +18,7 @@ function ProductsPage() {
   const [editingId, setEditingId] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedCollections, setSelectedCollections] = useState([]);
 
   useEffect(() => {
@@ -56,11 +57,11 @@ function ProductsPage() {
     } else if (itemNumber.startsWith('X_')) {
       setCategory('Extreme Shield');
     } else if (itemNumber.startsWith('KB_')) {
-      setCategory('Kids (Boys)');
+      setCategory('Kids');
     } else if (itemNumber.startsWith('KG_')) {
-      setCategory('Kids (Girls)');
+      setCategory('Kids');
     } else if (itemNumber.startsWith('KU_')) {
-      setCategory('Kids (Uni)');
+      setCategory('Kids');
     } else if (itemNumber.startsWith('KX_')) {
       setCategory('Kids (Extreme Shield)');
     } else {
@@ -142,6 +143,15 @@ function ProductsPage() {
       .catch(err => setError(err.message));
   };
 
+  const toggleCategory = (cat) => {
+  if (selectedCategories.includes(cat)) {
+    setSelectedCategories(selectedCategories.filter(c => c !== cat));
+  } else {
+    setSelectedCategories([...selectedCategories, cat]);
+  }
+};
+
+
   const toggleCollection = (col) => {
     if (selectedCollections.includes(col)) {
       setSelectedCollections(selectedCollections.filter(c => c !== col));
@@ -151,16 +161,20 @@ function ProductsPage() {
   };
 
   const filteredItems = items.filter(item => {
-    const matchesSearch =
-      !searchTerm ||
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.itemNumber.toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesSearch =
+    !searchTerm ||
+    (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    item.itemNumber.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesCollection =
-      selectedCollections.length === 0 || selectedCollections.includes(item.collection);
+  const matchesCollection =
+    selectedCollections.length === 0 || selectedCollections.includes(item.collection);
 
-    return matchesSearch && matchesCollection;
-  });
+  const matchesCategory =
+    selectedCategories.length === 0 || selectedCategories.includes(item.category);
+
+  return matchesSearch && matchesCollection && matchesCategory;
+});
+
 
   return (
     <div>
@@ -178,8 +192,21 @@ function ProductsPage() {
           placeholder="Search by name or item number..."
           style={{ width: '100%', marginBottom: 10 }}
         />
+        <div style={{ marginBottom: 20 }}>
+          <strong>Filter by Category:</strong><br />
+          {uniqueOptions('category').map(cat => (
+            <label key={cat} style={{ marginRight: 10 }}>
+              <input
+                type="checkbox"
+                checked={selectedCategories.includes(cat)}
+                onChange={() => toggleCategory(cat)}
+              />
+              {cat}
+            </label>
+          ))}
+        </div>
 
-        <div>
+        <div style={{ marginBottom: 20 }}>
           <strong>Filter by Collection:</strong><br />
           {uniqueOptions('collection').map(col => (
             <label key={col} style={{ marginRight: 10 }}>
