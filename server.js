@@ -224,6 +224,17 @@ const info = insertOrder.run(customerName || '', totalQuantity, notes || '');
 });
 
 // =====================
+// Delete Order Route
+// =====================
+app.delete('/api/orders/:id', (req, res) => {
+  const id = req.params.id;
+  db.prepare('DELETE FROM order_items WHERE orderId = ?').run(id);
+  db.prepare('DELETE FROM orders WHERE id = ?').run(id);
+  res.json({ success: true });
+});
+
+
+// =====================
 // Server Start
 // =====================
 const PORT = 5000;

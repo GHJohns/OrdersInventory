@@ -10,6 +10,8 @@ export default function OrdersPage() {
   const [filterDate, setFilterDate] = useState('');
   const [error, setError] = useState('');
   const [notes, setNotes] = useState('');
+  const [copiedOrder, setCopiedOrder] = useState(null);
+
 
 
   useEffect(() => {
@@ -105,10 +107,75 @@ export default function OrdersPage() {
       .catch(err => setError(err.message));
   };
 
+  const handleCopy = (order) => {
+  setCopiedOrder({
+    customerName: order.customerName,
+    notes: order.notes || '',
+    items: order.items.map(item => ({
+      itemNumber: item.itemNumber,
+      quantity: item.quantity
+    }))
+  });
+};
+
+const handleDelete = (id) => {
+  if (!window.confirm('Are you sure you want to delete this order?')) return;
+
+  fetch(`http://localhost:5000/api/orders/${id}`, {
+    method: 'DELETE'
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to delete order');
+      loadOrders();
+    })
+    .catch(err => alert(err.message));
+};
+
+const submitCopiedOrder = () => {
+  const validItems = copiedOrder.items.filter(r => r.itemNumber && Number(r.quantity) > 0);
+  if (!copiedOrder.customerName.trim() || validItems.length === 0) {
+    alert('Fill in a valid customer and items');
+    return;
+  }
+
+  fetch('http://localhost:5000/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      customerName: copiedOrder.customerName,
+      notes: copiedOrder.notes,
+      items: validItems
+    })
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('Failed to submit copied order');
+      return res.json();
+    })
+    .then(() => {
+      alert('Copied order submitted!');
+      setCopiedOrder(null);
+      loadOrders();
+    })
+    .catch(err => alert(err.message));
+};
+
+
   const clearFilters = () => {
     setFilterName('');
     setFilterDate('');
   };
+
+  const copyToNewOrderForm = (order) => {
+  setCustomerName(order.customerName + ' (copy)');
+  setNotes(order.notes || '');
+  const rows = order.items.map(item => ({
+    itemNumber: item.itemNumber,
+    quantity: item.quantity
+  }));
+  setOrderRows(rows.length ? rows : [{ itemNumber: '', quantity: 1 }]);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
 
   const canSubmit =
     orderRows.some(r => r.itemNumber && Number(r.quantity) > 0) &&
@@ -247,6 +314,7 @@ export default function OrdersPage() {
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {orders.length === 0 && <li>No orders found.</li>}
           {orders.map(order => (
+            
             <li key={order.id} style={{ borderBottom: '1px solid #ddd', marginBottom: 10 }}>
               <Link to={`/orders/${order.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                 <strong>Order ID:</strong> {order.id}<br />
@@ -256,9 +324,71 @@ export default function OrdersPage() {
 
                 <strong>Items:</strong> {order.items.length}
               </Link>
+
+              <div style={{ marginTop: 5 }}>
+                <button onClick={() => copyToNewOrderForm(order)} style={{ marginRight: 10 }}>
+                  Copy
+                </button>
+                <button onClick={() => handleDelete(order.id)} style={{ color: 'red' }}>
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
         </ul>
+
+        {copiedOrder && (
+  <div style={{ marginTop: 30, padding: 15, border: '1px solid #ccc' }}>
+    <h3>Copied Order</h3>
+    <label>Customer Name:</label><br />
+    <input
+      value={copiedOrder.customerName}
+      onChange={e => setCopiedOrder({ ...copiedOrder, customerName: e.target.value })}
+      style={{ width: '100%', marginBottom: 10 }}
+    />
+
+    <label>Notes:</label><br />
+    <textarea
+      value={copiedOrder.notes}
+      onChange={e => setCopiedOrder({ ...copiedOrder, notes: e.target.value })}
+      style={{ width: '100%', marginBottom: 10 }}
+    />
+
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10 }}>
+      <thead>
+        <tr>
+          <th>Item Number</th>
+          <th>Quantity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {copiedOrder.items.map((item, idx) => (
+          <tr key={idx}>
+            <td>{item.itemNumber}</td>
+            <td>
+              <input
+                type="number"
+                min="1"
+                value={item.quantity}
+                onChange={e => {
+                  const updated = [...copiedOrder.items];
+                  updated[idx].quantity = parseInt(e.target.value, 10) || 1;
+                  setCopiedOrder({ ...copiedOrder, items: updated });
+                }}
+                style={{ width: 60 }}
+              />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    <button onClick={submitCopiedOrder}>Submit Copied Order</button>
+    <button onClick={() => setCopiedOrder(null)} style={{ marginLeft: 10 }}>Cancel</button>
+  </div>
+)}
+
+
       </div>
     </div>
   );

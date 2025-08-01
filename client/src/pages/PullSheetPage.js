@@ -19,7 +19,6 @@ export default function PullSheetPage() {
       })
       .then(data => {
         if (!data || !data.id) throw new Error('Invalid order data.');
-        console.log('Fetched order:', data); // ✅ Make sure this prints
         if (data.items && Array.isArray(data.items)) {
           data.items.sort((a, b) => a.itemNumber.localeCompare(b.itemNumber));
         }
@@ -51,80 +50,154 @@ export default function PullSheetPage() {
     categoryTotals[cat] = (categoryTotals[cat] || 0) + item.quantity;
   });
 
+  const cellStyle = {
+    border: '1px solid #ccc',
+    padding: '6px 8px',
+    textAlign: 'left'
+  };
+
   return (
+    
     <div className="pull-sheet" style={{ maxWidth: '800px', margin: 'auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>Pull Sheet</h1>
-      <h2>Order #{order.id}</h2>
+      {/* Centered Logo */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        
+      </div>
+
       <p><strong>Customer:</strong> {order.customerName || 'N/A'}</p>
       <p><strong>Notes:</strong> {order.notes || '—'}</p>
-      <p><strong>Created:</strong> {new Date(order.createdAt).toLocaleString()}</p>
       <p><strong>Total Quantity:</strong> {order.totalQuantity}</p>
 
-      <button onClick={() => window.print()} style={{ marginBottom: '20px' }}>
-        Print Pull Sheet
-      </button>
+      <button onClick={() => window.print()} style={{ marginBottom: 20 }}>Print Pull Sheet</button>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-  <thead>
-    <tr>
-      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Item Number</th>
-      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Category</th>
-      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Collection</th>
-      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>Style</th>
-      <th style={{ borderBottom: '1px solid #333', textAlign: 'left' }}>*</th>
-      <th style={{ borderBottom: '1px solid #333', textAlign: 'right' }}>Quantity</th>
-    </tr>
-  </thead>
-  <tbody>
-    {order.items.length > 0 ? (
-      order.items.map(item => (
-        <tr key={`${item.id}-${item.itemNumber}`}>
-          <td>{item.itemNumber}</td>
-          <td>{item.category || 'Uncategorized'}</td>
-          <td>{item.collection || '—'}</td>
-          <td>{item.style || '—'}</td>
-          <td>{item.special || '_'}</td>
-          <td style={{ textAlign: 'right' }}>{item.quantity}</td>
-        </tr>
-      ))
-    ) : (
-      <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px' }}>No items in this order.</td></tr>
-    )}
-  </tbody>
-</table>
+      <table style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        border: '1px solid #ccc'
+      }}>
+        <thead>
+          <tr style={{ backgroundColor: '#f0f0f0' }}>
+            <th style={cellStyle}>Item Number</th>
+            <th style={cellStyle}>Name</th>
+            <th style={cellStyle}>Category</th>
+            <th style={cellStyle}>Collection</th>
+            <th style={cellStyle}>Quantity</th>
+          </tr>
+        </thead>
+        <tbody>
+          {order.items.map((item, idx) => (
+            <tr key={item.itemNumber} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
+              <td style={cellStyle}>{item.itemNumber}</td>
+              <td style={cellStyle}>{item.name}</td>
+              <td style={cellStyle}>{item.category}</td>
+              <td style={cellStyle}>{item.collection}</td>
+              <td style={cellStyle}>{item.quantity}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-
-      <h3 style={{ marginTop: '30px' }}>Category Totals</h3>
+      <h3 style={{ marginTop: 30 }}>Category Totals</h3>
       <ul>
         {Object.entries(categoryTotals).map(([category, total]) => (
           <li key={category}><strong>{category}:</strong> {total}</li>
         ))}
       </ul>
 
-      <Link to="/orders" style={{ display: 'inline-block', marginTop: '20px' }}>
+      <Link to="/orders" style={{ display: 'inline-block', marginTop: 20 }}>
         &larr; Back to Orders
       </Link>
 
+      {/* Footer for print */}
+      <div className="print-footer" style={{ marginTop: '50px' }}>
+  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 40px' }}>
+    <div style={{ textAlign: 'left' }}>
+      <div>📞 (843) 626-7900</div>
+      <div>📧 SunRayz843@gmail.com</div>
+    </div>
+
+    <div style={{ textAlign: 'center' }}>
+      <img
+        src="https://api.qrserver.com/v1/create-qr-code/?data=https://sun-rayz.com&size=80x80"
+        alt="QR Code"
+      />
+      <div style={{ fontSize: '10pt' }}>https://sun-rayz.com</div>
+    </div>
+
+    <div style={{ textAlign: 'right' }}>
+      {new Date(order.createdAt).toLocaleString()}
+    </div>
+  </div>
+</div>
+
+
       <style>{`
         @media print {
-          button, a {
-            display: none !important;
-          }
-          body {
-            background: #fff;
-          }
-          .pull-sheet {
-            max-width: 100%;
-            margin: 0;
-            padding: 0;
-          }
-          table {
-            font-size: 12pt;
-          }
-          h1, h2, h3 {
-            margin: 0;
-          }
-        }
+  button, a {
+    display: none !important;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .pull-sheet {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  table {
+    font-size: 12pt !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 6px 8px !important;
+    text-align: left !important;
+  }
+
+  thead {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f9f9f9 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  tr:nth-child(odd) {
+    background-color: #fff !important;
+  }
+
+  h1, h2, h3 {
+    margin: 0 !important;
+  }
+
+  .print-footer {
+    page-break-inside: avoid;
+    margin-top: auto;
+    padding: 20px 40px;
+    font-size: 10pt;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  ul {
+    page-break-inside: avoid;
+  }
+}
+
       `}</style>
     </div>
   );

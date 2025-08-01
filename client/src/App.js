@@ -7,14 +7,15 @@ import PullSheetPage from './pages/PullSheetPage';
 function App() {
   return (
     <Router>
-      <div style={{ maxWidth: 800, margin: 'auto', padding: 20, fontFamily: 'Arial, sans-serif' }}>
-        <h1><img
-  src="https://sun-rayz.com/cdn/shop/files/test_230x.png?v=1632410189"
-  alt="Sun Rayz Logo"
-  style={{ maxHeight: 80, marginBottom: 20 }}
-/>
-</h1>
+      <div style={{ textAlign: 'center', marginBottom: 30 }}>
+  <img
+    src="https://sun-rayz.com/cdn/shop/files/test_230x.png?v=1632410189"
+    alt="Sun Rayz Logo"
+    style={{ height: 100 }}
+  />
+  </div>
 
+      <div>
         <nav style={{ marginBottom: 20 }}>
           <Link to="/products" style={{ marginRight: 10 }}>Products</Link>
           <Link to="/orders">Orders</Link>
