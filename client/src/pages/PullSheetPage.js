@@ -20,7 +20,40 @@ export default function PullSheetPage() {
       .then(data => {
         if (!data || !data.id) throw new Error('Invalid order data.');
         if (data.items && Array.isArray(data.items)) {
-          data.items.sort((a, b) => a.itemNumber.localeCompare(b.itemNumber));
+          const categoryOrder = [
+            'Standard',
+            'Xtreme',
+            'Polarized',
+            'Kids',
+            'Kids Xtreme',
+            'Retainers',
+            'Racks'
+          ];
+
+data.items.sort((a, b) => {
+  const catA = a.category || '';
+  const catB = b.category || '';
+  const idxA = categoryOrder.indexOf(catA);
+  const idxB = categoryOrder.indexOf(catB);
+
+  // If both categories are in the list, sort by index
+  if (idxA !== -1 && idxB !== -1) {
+    if (idxA !== idxB) return idxA - idxB;
+    // Same category → sort by collection, then itemNumber
+    const collA = a.collection || '';
+    const collB = b.collection || '';
+    if (collA !== collB) return collA.localeCompare(collB);
+    return a.itemNumber.localeCompare(b.itemNumber);
+  }
+
+  // If only one is in the list, it comes first
+  if (idxA !== -1) return -1;
+  if (idxB !== -1) return 1;
+
+  // Neither in list → fallback to default
+  return a.itemNumber.localeCompare(b.itemNumber);
+});
+
         }
         setOrder(data);
       })
@@ -77,9 +110,8 @@ export default function PullSheetPage() {
       }}>
         <thead>
           <tr style={{ backgroundColor: '#f0f0f0' }}>
-            <th style={cellStyle}>Item Number</th>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Category</th>
+            <th style={cellStyle}>Category</th>            
+            <th style={cellStyle}>Item</th>            
             <th style={cellStyle}>Collection</th>
             <th style={cellStyle}>Quantity</th>
           </tr>
@@ -87,9 +119,8 @@ export default function PullSheetPage() {
         <tbody>
           {order.items.map((item, idx) => (
             <tr key={item.itemNumber} style={{ backgroundColor: idx % 2 === 0 ? '#fff' : '#f9f9f9' }}>
-              <td style={cellStyle}>{item.itemNumber}</td>
-              <td style={cellStyle}>{item.name}</td>
-              <td style={cellStyle}>{item.category}</td>
+              <td style={cellStyle}>{item.category}</td>              
+              <td style={cellStyle}>{item.name}</td>              
               <td style={cellStyle}>{item.collection}</td>
               <td style={cellStyle}>{item.quantity}</td>
             </tr>
