@@ -53,96 +53,127 @@ db.prepare(`
 // =====================
 
 // Update an existing order
+// server.js (add this PUT handler where your other /api/orders routes live)
 app.put('/api/orders/:id', async (req, res) => {
-  try {
-    const orderId = req.params.id;
-    const { customerName, notes, items, touchTimestamp } = req.body;
+  const orderId = Number(req.params.id);
+  const { customerName, notes, items, touchTimestamp } = req.body || {};
 
-    // Update order info
+  if (!orderId || !customerName || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Invalid payload: require customerName and non-empty items[]' });
+  }
+
+  try {
+    const existing = await db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (!existing) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Update header (optionally bump createdAt so it sorts to top on edit)
     if (touchTimestamp) {
-      // refresh createdAt to now
       await db.run(
         "UPDATE orders SET customerName = ?, notes = ?, createdAt = datetime('now') WHERE id = ?",
-        [customerName, notes, orderId]
+        [customerName, notes || '', orderId]
       );
     } else {
       await db.run(
         "UPDATE orders SET customerName = ?, notes = ? WHERE id = ?",
-        [customerName, notes, orderId]
+        [customerName, notes || '', orderId]
       );
     }
 
-    // Replace items (simple approach: delete then re-insert)
-    await db.run("DELETE FROM order_items WHERE orderId = ?", [orderId]);
-    for (const item of items) {
+    // Replace items (simple + predictable)
+    await db.run('DELETE FROM order_items WHERE orderId = ?', [orderId]);
+    for (const it of items) {
+      const itemNumber = (it.itemNumber || '').trim();
+      const quantity = Number(it.quantity) || 0;
+      if (!itemNumber || quantity <= 0) continue;
       await db.run(
-        "INSERT INTO order_items (orderId, itemNumber, quantity) VALUES (?, ?, ?)",
-        [orderId, item.itemNumber, item.quantity]
+        'INSERT INTO order_items (orderId, itemNumber, quantity) VALUES (?, ?, ?)',
+        [orderId, itemNumber, quantity]
       );
     }
 
-    res.sendStatus(204); // success, no content
+    // Return updated order (header + items) so client can rely on the response
+    const updated = await db.get('SELECT * FROM orders WHERE id = ?', [orderId]);
+    const updatedItems = await db.all(
+      `SELECT oi.itemNumber, oi.quantity,
+              i.name, i.category, i.collection
+         FROM order_items oi
+         LEFT JOIN items i ON i.itemNumber = oi.itemNumber
+        WHERE oi.orderId = ?
+        ORDER BY oi.rowid ASC`,
+      [orderId]
+    );
+
+    return res.status(200).json({ ...updated, items: updatedItems });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update order" });
+    console.error('PUT /api/orders/:id failed:', err);
+    return res.status(500).json({ error: 'Failed to update order' });
   }
 });
 
 
+
+
 // Get all orders with items, createdAt formatted as ISO 8601 UTC
+
+
+
+// server.js
+// GET all orders with embedded items (client will sort/limit to 20)
 app.get('/api/orders', (req, res) => {
   try {
-    const orders = db.prepare(`
-      SELECT id, customerName, totalQuantity, notes,
-             STRFTIME('%Y-%m-%dT%H:%M:%SZ', createdAt) AS createdAt
-      FROM orders
-    `).all();
+    const orders = db.prepare('SELECT * FROM orders').all();
 
-    const getOrderItems = db.prepare(`
-      SELECT oi.*, i.itemNumber, i.name 
+    const itemsStmt = db.prepare(`
+      SELECT oi.itemNumber, oi.quantity,
+             i.name, i.category, i.collection
       FROM order_items oi
-      JOIN items i ON oi.itemId = i.id
+      LEFT JOIN items i ON i.itemNumber = oi.itemNumber
       WHERE oi.orderId = ?
+      ORDER BY oi.rowid ASC
     `);
 
-    const ordersWithItems = orders.map(order => {
-      const items = getOrderItems.all(order.id);
-      return { ...order, items };
-    });
+    const result = orders.map(o => ({
+      ...o,
+      items: itemsStmt.all(o.id)
+    }));
 
-    res.json(ordersWithItems);
+    res.json(result);
   } catch (err) {
-    console.error('Error fetching orders:', err);
+    console.error('GET /api/orders failed:', err);
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
 
-// Get one order by ID with createdAt as ISO 8601 UTC
-app.get('/api/orders/:id', (req, res) => {
-  const orderId = req.params.id;
-  try {
-    const order = db.prepare(`
-      SELECT id, customerName, totalQuantity, notes,
-             STRFTIME('%Y-%m-%dT%H:%M:%SZ', createdAt) AS createdAt
-      FROM orders WHERE id = ?
-    `).get(orderId);
 
+
+// Get one order by ID with createdAt as ISO 8601 UTC
+// server.js
+// GET single order with embedded items
+app.get('/api/orders/:id', (req, res) => {
+  try {
+    const orderId = Number(req.params.id);
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     const items = db.prepare(`
-      SELECT oi.quantity, i.*
+      SELECT oi.itemNumber, oi.quantity,
+             i.name, i.category, i.collection
       FROM order_items oi
-      JOIN items i ON oi.itemId = i.id
+      LEFT JOIN items i ON i.itemNumber = oi.itemNumber
       WHERE oi.orderId = ?
+      ORDER BY oi.rowid ASC
     `).all(orderId);
 
-    order.items = items;
-    res.json(order);
+    res.json({ ...order, items });
   } catch (err) {
-    console.error(err);
+    console.error('GET /api/orders/:id failed:', err);
     res.status(500).json({ error: 'Failed to fetch order' });
   }
 });
+
+
 
 // =====================
 // Items Routes
@@ -167,15 +198,58 @@ app.post('/api/items', (req, res) => {
   }
 });
 
-app.put('/api/items/:id', (req, res) => {
+// PUT update order in-place (keep same ID). If `touchTimestamp: true`, bump createdAt.
+app.put('/api/orders/:id', (req, res) => {
+  const orderId = Number(req.params.id);
+  const { customerName, notes, items, touchTimestamp } = req.body || {};
+
+  if (!orderId || !customerName || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Invalid payload: require customerName and non-empty items[]' });
+  }
+
   try {
-    items.updateItem(req.params.id, req.body);
-    res.json({ success: true });
+    const exists = db.prepare('SELECT id FROM orders WHERE id = ?').get(orderId);
+    if (!exists) return res.status(404).json({ error: 'Order not found' });
+
+    const updateHeader =
+      touchTimestamp
+        ? db.prepare("UPDATE orders SET customerName = ?, notes = ?, createdAt = datetime('now') WHERE id = ?")
+        : db.prepare("UPDATE orders SET customerName = ?, notes = ? WHERE id = ?");
+
+    const deleteItems = db.prepare("DELETE FROM order_items WHERE orderId = ?");
+    const insertItem  = db.prepare("INSERT INTO order_items (orderId, itemNumber, quantity) VALUES (?, ?, ?)");
+
+    const saveTx = db.transaction(() => {
+      updateHeader.run(customerName, notes || '', orderId);
+      deleteItems.run(orderId);
+      for (const it of items) {
+        const itemNumber = (it.itemNumber || '').trim();
+        const quantity = Number(it.quantity) || 0;
+        if (!itemNumber || quantity <= 0) continue;
+        insertItem.run(orderId, itemNumber, quantity);
+      }
+    });
+
+    saveTx(); // run the transaction
+
+    // Return updated order with items so the client can rely on it
+    const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    const updatedItems = db.prepare(`
+      SELECT oi.itemNumber, oi.quantity,
+             i.name, i.category, i.collection
+      FROM order_items oi
+      LEFT JOIN items i ON i.itemNumber = oi.itemNumber
+      WHERE oi.orderId = ?
+      ORDER BY oi.rowid ASC
+    `).all(orderId);
+
+    res.status(200).json({ ...updated, items: updatedItems });
   } catch (err) {
-    console.error('Error updating item:', err);
-    res.status(500).json({ error: 'Failed to update item' });
+    console.error('PUT /api/orders/:id failed:', err);
+    res.status(500).json({ error: 'Failed to update order' });
   }
 });
+
 
 app.delete('/api/items/:id', (req, res) => {
   items.deleteItem(req.params.id);

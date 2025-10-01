@@ -138,29 +138,32 @@ export default function OrdersPage() {
     const payload = { customerName, notes, items: validItems };
 
     // EDITING an existing order → PUT (keep same ID), then go to its Pull Sheet
-    if (editingOrderId) {
-      fetch(`http://localhost:5000/api/orders/${editingOrderId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        // tell server to refresh timestamp on edit for preview
-        body: JSON.stringify({ ...payload, touchTimestamp: true })
-      })
-        .then(async (res) => {
-          if (!res.ok) {
-            const text = await res.text().catch(() => '');
-            throw new Error(text || 'Failed to update order');
-          }
-          return res; // no need to read body if server returns 204
-        })
-        .then(() => {
-          navigate(`/pull-sheet/${editingOrderId}`);
-          setError('');
-          loadOrders(); // list will reflect updated timestamp
-          // keep form in current state; do not clear editing so a second tweak is possible if they go back
-        })
-        .catch(err => setError(err.message));
-      return;
-    }
+    // inside previewOrder(), editing branch only
+// inside previewOrder(), editing branch
+if (editingOrderId) {
+  fetch(`http://localhost:5000/api/orders/${editingOrderId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customerName, notes, items: validItems, touchTimestamp: true })
+  })
+    .then(async (res) => {
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(text || 'Failed to update order');
+      }
+      const updated = await res.json(); // server returns updated order
+      return updated.id;
+    })
+    .then((id) => {
+      navigate(`/pull-sheet/${id}`);
+      setError('');
+      loadOrders();
+    })
+    .catch(err => setError(err.message));
+  return;
+}
+
+
 
     // CREATING a new order → POST, then go to new Pull Sheet
     fetch('http://localhost:5000/api/orders', {
