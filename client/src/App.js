@@ -26,6 +26,7 @@ function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:orderId" element={<PullSheetPage />} />
+          <Route path="/pull-sheet/:orderId" element={<PullSheetPage />} />
         </Routes>
       </div>
     </Router>

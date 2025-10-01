@@ -52,6 +52,43 @@ db.prepare(`
 // Orders Routes
 // =====================
 
+// Update an existing order
+app.put('/api/orders/:id', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { customerName, notes, items, touchTimestamp } = req.body;
+
+    // Update order info
+    if (touchTimestamp) {
+      // refresh createdAt to now
+      await db.run(
+        "UPDATE orders SET customerName = ?, notes = ?, createdAt = datetime('now') WHERE id = ?",
+        [customerName, notes, orderId]
+      );
+    } else {
+      await db.run(
+        "UPDATE orders SET customerName = ?, notes = ? WHERE id = ?",
+        [customerName, notes, orderId]
+      );
+    }
+
+    // Replace items (simple approach: delete then re-insert)
+    await db.run("DELETE FROM order_items WHERE orderId = ?", [orderId]);
+    for (const item of items) {
+      await db.run(
+        "INSERT INTO order_items (orderId, itemNumber, quantity) VALUES (?, ?, ?)",
+        [orderId, item.itemNumber, item.quantity]
+      );
+    }
+
+    res.sendStatus(204); // success, no content
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update order" });
+  }
+});
+
+
 // Get all orders with items, createdAt formatted as ISO 8601 UTC
 app.get('/api/orders', (req, res) => {
   try {
